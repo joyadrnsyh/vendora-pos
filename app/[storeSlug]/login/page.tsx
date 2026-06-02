@@ -12,7 +12,7 @@ import { supabase } from "../../../lib/supabase";
 export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug: string }> }) {
   const { storeSlug } = React.use(params);
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginRole, setLoginRole] = useState<"Admin" | "Kasir">("Kasir");
   const [isLoading, setIsLoading] = useState(false);
@@ -70,8 +70,9 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
 
     try {
       // Login menggunakan Supabase Auth
+      const dummyEmail = `${username.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendora.local`;
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: dummyEmail,
         password,
       });
 
@@ -79,7 +80,7 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
 
       // Simpan sesi di sessionStorage
       sessionStorage.setItem("isLoggedIn", "true");
-      sessionStorage.setItem("userEmail", email);
+      sessionStorage.setItem("userEmail", username);
       sessionStorage.setItem("userRole", loginRole);
       sessionStorage.setItem("storeSlug", storeSlug);
       sessionStorage.setItem("storeName", storeName);
@@ -151,12 +152,12 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700">Email Pengguna</label>
+            <label className="block text-xs font-semibold text-slate-700">Username Pengguna</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={`Contoh: ${loginRole.toLowerCase()}@toko.com`}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={`Contoh: ${loginRole.toLowerCase()}`}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all bg-slate-50 focus:bg-white"
               required
               disabled={storeExists === false}

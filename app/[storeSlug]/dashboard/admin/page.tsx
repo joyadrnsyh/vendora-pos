@@ -278,12 +278,13 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
           status: userForm.status
         }).eq("id", editingUser.id);
       } else {
-        await supabase.auth.signUp({ email: userForm.email, password: userForm.password });
+        const dummyEmail = `${userForm.email.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendora.local`;
+        await supabase.auth.signUp({ email: dummyEmail, password: userForm.password });
 
         await supabase.from("users").insert({
           store_slug: storeSlug,
           name: userForm.name,
-          email: userForm.email,
+          email: userForm.email, // We store the actual username here (reusing the 'email' field in state)
           role: userForm.role,
           status: userForm.status
         });
@@ -985,7 +986,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
             </div>
             <form onSubmit={handleSaveUser} className="p-6 space-y-4">
               <div className="bg-blue-50 border border-blue-200 text-blue-700 text-xs px-4 py-3 rounded-xl mb-2">
-                <strong>Info:</strong> Karyawan yang dibuat di sini akan <strong>otomatis dibuatkan akun</strong> dan bisa langsung *login* menggunakan email dan kata sandi yang Anda tentukan!
+                <strong>Info:</strong> Karyawan yang dibuat di sini akan <strong>otomatis dibuatkan akun</strong> dan bisa langsung *login* menggunakan username dan kata sandi yang Anda tentukan!
               </div>
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-700">Nama Lengkap</label>
@@ -998,9 +999,9 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-700">Alamat Email</label>
+                <label className="block text-xs font-semibold text-slate-700">Username</label>
                 <input
-                  type="email"
+                  type="text"
                   value={userForm.email}
                   onChange={e => setUserForm({ ...userForm, email: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-orange-500 text-sm"
