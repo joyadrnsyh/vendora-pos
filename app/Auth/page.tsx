@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import "../globals.css";
 
@@ -10,13 +10,23 @@ import { auth, googleProvider, db } from "../../lib/firebase";
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    // Penjaga URL: Memastikan pengunjung datang dari /pricing atau /checkout
+    const hasPaid = sessionStorage.getItem("hasPaid");
+    const isTrial = searchParams.get("trial");
+    if (!hasPaid && !isTrial) {
+      router.push("/pricing");
+    }
+  }, [router, searchParams]);
 
   const checkUserStoreAndRedirect = async (uid: string, userEmail: string | null) => {
     // Cari toko yang dimiliki oleh uid ini
@@ -29,17 +39,17 @@ export default function AuthPage() {
       const storeData = storeDoc.data();
       const slug = storeData.slug;
       
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userEmail", userEmail || "");
-      localStorage.setItem("userRole", "Admin");
-      localStorage.setItem("storeSlug", slug);
-      localStorage.setItem("storeName", storeData.name);
+      sessionStorage.setItem("isLoggedIn", "true");
+      sessionStorage.setItem("userEmail", userEmail || "");
+      sessionStorage.setItem("userRole", "Admin");
+      sessionStorage.setItem("storeSlug", slug);
+      sessionStorage.setItem("storeName", storeData.name);
       
       router.push(`/${slug}/dashboard/admin`);
     } else {
       // Tidak punya toko, arahkan ke setup
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userEmail", userEmail || "");
+      sessionStorage.setItem("isLoggedIn", "true");
+      sessionStorage.setItem("userEmail", userEmail || "");
       router.push("/setup-store");
     }
   };
@@ -50,9 +60,9 @@ export default function AuthPage() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       await checkUserStoreAndRedirect(result.user.uid, result.user.email);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setErrorMsg("Gagal login dengan Google: " + error.message);
+      setErrorMsg("Gagal login dengan Google: " + (error as Error).message);
       setIsLoading(false);
     }
   };
@@ -72,9 +82,9 @@ export default function AuthPage() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await checkUserStoreAndRedirect(userCredential.user.uid, userCredential.user.email);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error during auth:", error);
-      setErrorMsg(error.message);
+      setErrorMsg((error as Error).message);
       setIsLoading(false);
     }
   };
@@ -202,12 +212,20 @@ export default function AuthPage() {
           {/* Menghapus opsi Coba Demo untuk Admin, fokus pada flow pembuatan toko */}
 
           <div className="text-center pt-2">
-            <Link href="/" className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors">
-              ← Kembali ke Beranda
+            <Link href="/pricing" className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors">
+              ← Kembali ke Pilihan Paket
             </Link>
           </div>
         </form>
       </div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Memeriksa Keamanan...</div>}>
+      <AuthForm />
+    </Suspense>
   );
 }

@@ -54,30 +54,32 @@ export default function SetupStorePage() {
       }
 
       // 2. Simpan data toko ke Firestore
-      await setDoc(storeRef, {
+      const plan = sessionStorage.getItem("planSubscribed") || "Uji Coba 14 Hari";
+
+      await setDoc(doc(db, "stores", slug), {
         name: storeName,
         slug: slug,
         ownerName: ownerName,
         ownerEmail: user.email,
         ownerUid: user.uid,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        plan: plan
       });
 
       // Simpan sesi lokal
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userEmail", user.email || "");
-      localStorage.setItem("userRole", "Admin");
-      localStorage.setItem("storeName", storeName);
-      localStorage.setItem("storeSlug", slug);
-      localStorage.setItem("userName", ownerName);
+      sessionStorage.setItem("isLoggedIn", "true");
+      sessionStorage.setItem("userEmail", user.email || "");
+      sessionStorage.setItem("userRole", "Admin");
+      sessionStorage.setItem("storeName", storeName);
+      sessionStorage.setItem("storeSlug", slug);
+      sessionStorage.setItem("userName", ownerName);
 
       // 3. Redirect ke dashboard admin dengan slug
       router.push(`/${slug}/dashboard/admin`);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error setting up store:", error);
-      setErrorMsg(error.message);
+      setErrorMsg((error as Error).message);
       setIsLoading(false);
     }
   };

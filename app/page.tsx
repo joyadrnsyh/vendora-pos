@@ -45,7 +45,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-10">
-            <Link href="/auth" className="group relative text-center overflow-hidden bg-orange-500 hover:bg-orange-600 text-white font-semibold px-10 py-4 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/30">
+            <Link href="/pricing" className="group relative text-center overflow-hidden bg-orange-500 hover:bg-orange-600 text-white font-semibold px-10 py-4 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/30">
               <span className="relative z-10">Coba Gratis</span>
               <div className="absolute inset-0 -translate-x-full bg-white/20 skew-x-12 group-hover:translate-x-full transition-transform duration-700" />
             </Link>
@@ -219,14 +219,12 @@ export default function Home() {
                   </li>
                 </ul>
               </div>
-              <a
-                href="https://wa.me/6285161128731?text=Halo%20Vendora%20POS%2C%20saya%20tertarik%20dengan%20paket%20Starter."
-                target="_blank"
-                rel="noreferrer"
+              <Link
+                href="/checkout?plan=starter"
                 className="block w-full text-center py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs transition"
               >
                 Pilih Starter
-              </a>
+              </Link>
             </div>
 
             {/* Plan 2: Featured Pro */}
@@ -259,14 +257,12 @@ export default function Home() {
                   </li>
                 </ul>
               </div>
-              <a
-                href="https://wa.me/6285161128731?text=Halo%20Vendora%20POS%2C%20saya%20tertarik%20dengan%20paket%20Business%20Pro."
-                target="_blank"
-                rel="noreferrer"
+              <Link
+                href="/checkout?plan=pro"
                 className="block w-full text-center py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs transition shadow-lg shadow-orange-500/20"
               >
                 Pilih Business Pro
-              </a>
+              </Link>
             </div>
 
             {/* Plan 3 */}
@@ -320,12 +316,12 @@ export default function Home() {
               Mulai gratis 14 hari sekarang. Akses penuh fitur, tidak membutuhkan kartu kredit, batalkan kapan saja Anda mau.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
-              <a
-                href="#about"
+              <Link
+                href="/pricing"
                 className="px-8 py-3.5 rounded-2xl bg-white hover:bg-zinc-100 text-orange-600 font-extrabold text-sm transition shadow-lg hover:shadow-xl hover:scale-105 duration-300"
               >
-                Coba Demo Kasir Gratis
-              </a>
+                Mulai Berlangganan
+              </Link>
               <a
                 href="https://wa.me/6285161128731?text=Halo%20Vendora%20POS%2C%20saya%20ingin%20berkonsultasi%20mengenai%20langganan."
                 target="_blank"

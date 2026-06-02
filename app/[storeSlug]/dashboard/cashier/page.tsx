@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useState, useEffect, use } from "react";
@@ -13,7 +14,8 @@ import {
   MinusIcon,
   ArrowLeftOnRectangleIcon,
   CheckCircleIcon,
-  XMarkIcon
+  XMarkIcon,
+  PrinterIcon
 } from "@heroicons/react/24/outline";
 
 // Firebase imports
@@ -33,14 +35,13 @@ interface CartItem extends Product {
   quantity: number;
 }
 
-const categories = ["Semua", "Kopi", "Non-Kopi", "Teh", "Makanan"];
-
 export default function CashierDashboard({ params }: { params: Promise<{ storeSlug: string }> }) {
   const { storeSlug } = use(params);
   const router = useRouter();
 
-  const [storeName, setStoreName] = useState("Memuat...");
-  const [userName, setUserName] = useState("Kasir");
+  const [storeName, setStoreName] = useState("");
+  const [userName, setUserName] = useState("");
+  const [storeLogo, setStoreLogo] = useState("");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -54,10 +55,12 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
   const [paymentMethod, setPaymentMethod] = useState("Tunai");
 
   useEffect(() => {
-    const storedStore = localStorage.getItem("storeName") || storeSlug.replace(/-/g, " ").toUpperCase();
-    const storedUser = localStorage.getItem("userName") || "Kasir Vendora";
+    const storedStore = sessionStorage.getItem("storeName") || storeSlug.replace(/-/g, " ").toUpperCase();
+    const storedUser = sessionStorage.getItem("userName") || "Kasir Vendora";
+    const storedLogo = sessionStorage.getItem("storeLogo") || "";
     setStoreName(storedStore);
     setUserName(storedUser);
+    setStoreLogo(storedLogo);
 
     // Fetch Products Real-time
     const qProducts = query(collection(db, "stores", storeSlug, "products"));
@@ -75,8 +78,12 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
   }, [storeSlug]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    sessionStorage.clear();
     router.push(storeSlug ? `/${storeSlug}/login` : "/Auth");
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   // Extract unique categories from actual products or use defaults
@@ -175,11 +182,6 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
       // Sukses
       setIsCheckoutModalOpen(false);
       setCheckoutSuccess(true);
-      setTimeout(() => {
-        setCart([]);
-        setCheckoutSuccess(false);
-      }, 3000);
-
     } catch (error) {
       console.error("Gagal melakukan checkout:", error);
       alert("Terjadi kesalahan saat memproses pembayaran.");
@@ -191,17 +193,17 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
       {/* Top Navbar */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-lg shadow-orange-600/20">
-            <BuildingStorefrontIcon className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">
-              Vendora POS
-            </h1>
-            <span className="text-xs font-medium text-slate-500">{storeName}</span>
-          </div>
-          <span className="ml-4 bg-orange-100 text-orange-600 px-2.5 py-1 rounded-full text-xs font-bold">
-            KASIR
+          {storeLogo ? (
+            <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200">
+              <img src={storeLogo} alt="Logo" className="h-full w-full object-contain" />
+            </div>
+          ) : (
+            <div className="h-10 w-10 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-lg shadow-orange-600/20">
+              <BuildingStorefrontIcon className="h-6 w-6" />
+            </div>
+          )}
+          <span className="text-2xl font-bold text-slate-900 tracking-tight truncate">
+            {storeName} <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full ml-1 align-top">KASIR</span>
           </span>
         </div>
 
@@ -365,32 +367,45 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
 
             <button
               onClick={handleOpenCheckoutModal}
-              disabled={cart.length === 0 || checkoutSuccess}
-              className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 mt-4 ${cart.length === 0
-                ? "bg-slate-300 cursor-not-allowed shadow-none"
-                : checkoutSuccess
-                  ? "bg-emerald-500 shadow-emerald-500/20"
-                  : "bg-orange-600 hover:bg-orange-700 shadow-orange-600/20 hover:shadow-xl hover:-translate-y-0.5"
-                }`}
+              disabled={cart.length === 0}
+              className="w-full py-4 rounded-xl font-bold text-white bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-600/20 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0"
             >
-              {checkoutSuccess ? (
-                <>
-                  <CheckCircleIcon className="h-6 w-6" />
-                  Pembayaran Berhasil!
-                </>
-              ) : (
-                <>
-                  Lanjutkan Pembayaran
-                </>
-              )}
+              Lanjutkan Pembayaran
             </button>
           </div>
         </aside>
-
       </div>
 
+      {/* Checkout Success Modal */}
+      {checkoutSuccess && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 relative shadow-2xl border border-slate-100 text-center animate-fade-in-up">
+            <div className="h-20 w-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircleIcon className="h-10 w-10" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Transaksi Sukses!</h2>
+            <p className="text-slate-500 mb-8">Pembayaran berhasil dicatat ke sistem.</p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={handlePrint}
+                className="w-full py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2"
+              >
+                <PrinterIcon className="h-5 w-5" /> Cetak Struk
+              </button>
+              <button
+                onClick={() => { setCheckoutSuccess(false); setCart([]); }}
+                className="w-full py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Transaksi Baru
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Checkout Modal */}
-      {isCheckoutModalOpen && (
+      {isCheckoutModalOpen && !checkoutSuccess && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
@@ -445,6 +460,43 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
           </div>
         </div>
       )}
+
+      {/* Hidden Print Layout */}
+      <div className="print-receipt hidden">
+        <div className="text-center border-b border-black border-dashed pb-2 mb-2">
+          {storeLogo ? (
+             <img src={storeLogo} alt="Logo" className="max-w-[100px] max-h-[100px] mx-auto mb-2 object-contain" />
+          ) : (
+            <div className="font-bold text-lg mb-1">{storeName}</div>
+          )}
+          <div className="text-xs">Kasir: {userName}</div>
+          <div className="text-xs">{new Date().toLocaleString('id-ID')}</div>
+        </div>
+        
+        <div className="text-xs mb-2 pb-2 border-b border-black border-dashed">
+          {cart.map((item, i) => (
+            <div key={i} className="mb-1">
+              <div>{item.name}</div>
+              <div className="flex justify-between">
+                <span>{item.quantity} x {item.price}</span>
+                <span>{item.quantity * item.price}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-xs border-b border-black border-dashed pb-2 mb-2">
+          <div className="flex justify-between font-bold">
+            <span>TOTAL</span>
+            <span>Rp {cart.reduce((acc, item) => acc + item.price * item.quantity, 0).toLocaleString("id-ID")}</span>
+          </div>
+        </div>
+
+        <div className="text-center text-xs mt-4 font-bold">
+          TERIMA KASIH
+        </div>
+      </div>
+
     </main>
   );
 }

@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import "../globals.css";
+import "../../globals.css";
 import {
   BuildingStorefrontIcon,
   UserIcon,
@@ -17,14 +17,14 @@ export default function DashboardGateway({ params }: { params: Promise<{ storeSl
 
   const handleSelectRole = (path: string, role: string) => {
     // Simulasi set role
-    localStorage.setItem("userRole", role);
+    sessionStorage.setItem("userRole", role);
     router.push(`/${storeSlug}${path}`);
   };
 
   return (
     <main className="min-h-screen bg-slate-50 flex items-center justify-center font-sans p-6 text-slate-800">
       <div className="max-w-4xl w-full">
-        
+
         <div className="text-center mb-12">
           <div className="h-16 w-16 mx-auto rounded-2xl bg-orange-600 flex items-center justify-center text-white shadow-xl shadow-orange-600/20 mb-6">
             <BuildingStorefrontIcon className="h-10 w-10" />
@@ -38,7 +38,7 @@ export default function DashboardGateway({ params }: { params: Promise<{ storeSl
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
+
           {/* Admin Card */}
           <button
             onClick={() => handleSelectRole("/dashboard/admin", "Admin")}
@@ -94,7 +94,7 @@ export default function DashboardGateway({ params }: { params: Promise<{ storeSl
           </button>
 
         </div>
-        
+
         <div className="mt-12 text-center">
           <Link href="/" className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
             &larr; Kembali ke Beranda

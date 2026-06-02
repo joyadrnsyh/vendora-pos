@@ -142,7 +142,7 @@ export default function Navbar() {
                 {/* CTA Button & Hamburger */}
                 <div className="flex items-center gap-4">
                     <Link
-                        href="/Auth"
+                        href="/pricing"
                         className="hidden sm:inline-block px-5 py-2.5 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold shadow-md shadow-orange-600/10 hover:shadow-lg hover:shadow-orange-600/20 hover:scale-[1.03] transition duration-300"
                     >
                         Get Started
@@ -217,7 +217,7 @@ export default function Navbar() {
                         </li>
                         <li className="pt-2 border-t border-slate-100 sm:hidden">
                             <Link
-                                href="/Auth"
+                                href="/pricing"
                                 className="block w-full text-center px-5 py-3 rounded-full bg-orange-600 text-white font-semibold text-sm hover:bg-orange-700 transition"
                                 onClick={() => setIsOpen(false)}
                             >

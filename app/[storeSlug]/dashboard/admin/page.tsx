@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -23,7 +24,11 @@ import {
   UserPlusIcon,
   TrashIcon,
   PencilSquareIcon,
-  PlusIcon
+  PlusIcon,
+  UserGroupIcon,
+  ChartPieIcon,
+  CogIcon,
+  LockClosedIcon
 } from "@heroicons/react/24/outline";
 
 // Firebase imports
@@ -70,7 +75,54 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [storePlan, setStorePlan] = useState("Uji Coba 14 Hari");
   const [lowStockCount, setLowStockCount] = useState(0);
+
+  // Computed State for Reports & Customers
+  const customersMap = new Map<string, { totalSpend: number, visitCount: number, lastVisit: string }>();
+  transactions.forEach(t => {
+    if (t.status !== "Sukses") return;
+    const name = t.customer || "Pelanggan Umum";
+    const existing = customersMap.get(name) || { totalSpend: 0, visitCount: 0, lastVisit: "" };
+    customersMap.set(name, {
+      totalSpend: existing.totalSpend + t.total,
+      visitCount: existing.visitCount + 1,
+      lastVisit: t.date > existing.lastVisit ? t.date : existing.lastVisit
+    });
+  });
+  const topCustomers = Array.from(customersMap.entries())
+    .map(([name, data]) => ({ name, ...data }))
+    .sort((a, b) => b.totalSpend - a.totalSpend);
+
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    // adjust for local timezone roughly (for demo)
+    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+  }).reverse();
+
+  const dailyRevenue = last7Days.map(dateStr => {
+    const total = transactions.filter(t => t.date.startsWith(dateStr) && t.status === "Sukses")
+      .reduce((sum, t) => sum + t.total, 0);
+    return { date: dateStr, total };
+  });
+  const maxRevenue = Math.max(...dailyRevenue.map(d => d.total), 1);
+
+  const methodMap = new Map<string, number>();
+  transactions.filter(t => t.status === "Sukses").forEach(t => {
+    methodMap.set(t.method, (methodMap.get(t.method) || 0) + 1);
+  });
+  const totalSuccessTrans = transactions.filter(t => t.status === "Sukses").length || 1;
+  const methodsChart = Array.from(methodMap.entries()).map(([method, count]) => ({
+    method,
+    count,
+    percentage: (count / totalSuccessTrans) * 100
+  })).sort((a, b) => b.count - a.count);
+
+  // Settings State
+  const [settingStoreName, setSettingStoreName] = useState("");
+  const [storeLogo, setStoreLogo] = useState("");
+  const [settingStoreLogo, setSettingStoreLogo] = useState("");
 
   // Form State untuk Tambah/Edit Produk
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -84,10 +136,14 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
 
   useEffect(() => {
     // Ambil detail sesi
-    const storedStore = localStorage.getItem("storeName") || storeSlug.replace(/-/g, " ").toUpperCase();
-    const storedUser = localStorage.getItem("userName") || "Admin Vendora";
+    const storedStore = sessionStorage.getItem("storeName") || storeSlug.replace(/-/g, " ").toUpperCase();
+    const storedUser = sessionStorage.getItem("userName") || "Admin Vendora";
+    const storedLogo = sessionStorage.getItem("storeLogo") || "";
     setStoreName(storedStore);
+    setSettingStoreName(storedStore);
     setUserName(storedUser);
+    setStoreLogo(storedLogo);
+    setSettingStoreLogo(storedLogo);
 
     // Fetch Products Real-time
     const qProducts = query(collection(db, "stores", storeSlug, "products"));
@@ -113,6 +169,18 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
       setUsers(emps);
     });
 
+    // Fetch Store Details (Plan & Logo) Real-time
+    const unsubscribeStore = onSnapshot(doc(db, "stores", storeSlug), (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        setStorePlan(data.plan || "Uji Coba 14 Hari");
+        if (data.logoBase64) {
+          setStoreLogo(data.logoBase64);
+          sessionStorage.setItem("storeLogo", data.logoBase64);
+        }
+      }
+    });
+
     // Fetch Transactions Real-time
     const qTransactions = query(collection(db, "stores", storeSlug, "transactions"));
     const unsubscribeTransactions = onSnapshot(qTransactions, (querySnapshot) => {
@@ -129,11 +197,12 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
       unsubscribeProducts();
       unsubscribeUsers();
       unsubscribeTransactions();
+      unsubscribeStore();
     };
   }, [storeSlug]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    sessionStorage.clear();
     router.push(storeSlug ? `/${storeSlug}/login` : "/Auth");
   };
 
@@ -203,7 +272,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
         const uniqueAppName = "SecondaryApp_" + Date.now();
         const secondaryApp = initializeApp(app.options, uniqueAppName);
         const secondaryAuth = getAuth(secondaryApp);
-        
+
         await createUserWithEmailAndPassword(secondaryAuth, userForm.email, userForm.password);
         await signOut(secondaryAuth);
         await deleteApp(secondaryApp);
@@ -231,6 +300,40 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
         console.error("Gagal menghapus pengguna:", error);
       }
     }
+  };
+
+  const handleUpdateSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateDoc(doc(db, "stores", storeSlug), {
+        name: settingStoreName,
+        logoBase64: settingStoreLogo
+      });
+      sessionStorage.setItem("storeName", settingStoreName);
+      sessionStorage.setItem("storeLogo", settingStoreLogo);
+      setStoreName(settingStoreName);
+      setStoreLogo(settingStoreLogo);
+      alert("Pengaturan toko berhasil diperbarui!");
+    } catch (err: any) {
+      alert("Gagal memperbarui toko: " + err.message);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 500000) {
+      alert("Ukuran logo maksimal 500KB!");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Str = event.target?.result as string;
+      setSettingStoreLogo(base64Str);
+    };
+    reader.readAsDataURL(file);
   };
 
   const navigation = [
@@ -407,7 +510,13 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-bold text-slate-900">Katalog Produk</h3>
                 <button
-                  onClick={() => handleOpenProductModal()}
+                  onClick={() => {
+                    if (storePlan === "Starter" && products.length >= 200) {
+                      alert("Paket Starter dibatasi maksimal 200 produk. Upgrade ke Business Pro untuk produk tanpa batas!");
+                      return;
+                    }
+                    handleOpenProductModal();
+                  }}
                   className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm shadow-orange-600/20 hover:shadow-md"
                 >
                   <PlusIcon className="h-5 w-5" />
@@ -471,7 +580,15 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-bold text-slate-900">Daftar Pengguna Sistem</h3>
                 <button
-                  onClick={() => handleOpenUserModal()}
+                  onClick={() => {
+                    // Cek batasan Kasir
+                    const cashiers = users.filter(u => u.role === "Kasir").length;
+                    if (storePlan === "Starter" && cashiers >= 1) {
+                      alert("Paket Starter hanya mengizinkan 1 Akun Kasir. Upgrade ke Business Pro untuk jumlah kasir tanpa batas!");
+                      return;
+                    }
+                    handleOpenUserModal();
+                  }}
                   className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   <UserPlusIcon className="h-5 w-5" />
@@ -582,11 +699,185 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
             </div>
           )}
 
-          {activeTab !== "Overview" && activeTab !== "Products" && activeTab !== "Users" && activeTab !== "Transactions" && (
-            <div className="bg-white p-12 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
-              <Squares2X2Icon className="h-16 w-16 text-slate-200 mb-4" />
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Halaman {itemLabel(activeTab, navigation)}</h3>
-              <p className="text-slate-500 text-sm max-w-sm">Fitur ini sedang dalam pengembangan untuk fase berikutnya.</p>
+          {activeTab === "Customers" && storePlan === "Starter" && (
+            <div className="bg-white p-12 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-slate-50/50 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-6">
+                <LockClosedIcon className="h-16 w-16 text-orange-600 mb-4" />
+                <h3 className="text-2xl font-black text-slate-900 mb-2">Fitur Terkunci</h3>
+                <p className="text-slate-600 max-w-md mx-auto mb-6">Paket <strong>Starter</strong> tidak memiliki akses ke Manajemen Pelanggan (CRM). Dapatkan wawasan berharga tentang pelanggan loyal Anda dengan Business Pro.</p>
+                <a href="/pricing" className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-8 py-3.5 rounded-xl shadow-lg shadow-orange-600/30 transition-transform hover:scale-105">
+                  Upgrade ke Business Pro
+                </a>
+              </div>
+              <div className="opacity-20 pointer-events-none">
+                <h3 className="text-lg font-bold text-slate-900 mb-6">Pelanggan Loyal</h3>
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider bg-slate-50/50">
+                      <th className="py-4 px-4 rounded-tl-lg">Peringkat</th>
+                      <th className="py-4 px-4">Nama Pelanggan</th>
+                      <th className="py-4 px-4">Total Kunjungan</th>
+                      <th className="py-4 px-4">Total Dibelanjakan</th>
+                      <th className="py-4 px-4 rounded-tr-lg">Terakhir Belanja</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colSpan={5} className="py-12"></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "Customers" && storePlan !== "Starter" && (
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-slate-900">Pelanggan Loyal</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider bg-slate-50/50">
+                      <th className="py-4 px-4 rounded-tl-lg">Peringkat</th>
+                      <th className="py-4 px-4">Nama Pelanggan</th>
+                      <th className="py-4 px-4">Total Kunjungan</th>
+                      <th className="py-4 px-4">Total Dibelanjakan</th>
+                      <th className="py-4 px-4 rounded-tr-lg">Terakhir Belanja</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {topCustomers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-slate-400">
+                          <UserGroupIcon className="h-12 w-12 mx-auto mb-3 text-slate-200" />
+                          <p>Belum ada data pelanggan tercatat.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      topCustomers.map((c, idx) => (
+                        <tr key={c.name} className="hover:bg-slate-50 transition duration-150">
+                          <td className="py-4 px-4 font-bold text-slate-400">#{idx + 1}</td>
+                          <td className="py-4 px-4">
+                            <div className="font-semibold text-slate-900">{c.name}</div>
+                          </td>
+                          <td className="py-4 px-4 text-slate-600 font-medium">{c.visitCount} kali</td>
+                          <td className="py-4 px-4 text-orange-600 font-bold">Rp {c.totalSpend.toLocaleString("id-ID")}</td>
+                          <td className="py-4 px-4 text-slate-500 text-xs">
+                            {new Date(c.lastVisit).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "Reports" && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-slate-900">Tren Pendapatan Harian (7 Hari Terakhir)</h3>
+                </div>
+                <div className="h-64 flex items-end gap-2 pt-10">
+                  {dailyRevenue.map((d) => (
+                    <div key={d.date} className="flex-1 flex flex-col items-center gap-2 group">
+                      <div className="text-xs font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Rp {(d.total / 1000).toFixed(0)}k
+                      </div>
+                      <div
+                        className="w-full bg-orange-200 group-hover:bg-orange-500 transition-colors rounded-t-lg relative"
+                        style={{ height: `${(d.total / maxRevenue) * 100}%`, minHeight: '4px' }}
+                      ></div>
+                      <div className="text-xs font-medium text-slate-500 truncate w-full text-center">
+                        {d.date.split('-').slice(1, 3).join('/')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-slate-900">Metode Pembayaran Populer</h3>
+                </div>
+                <div className="space-y-4">
+                  {methodsChart.length === 0 ? (
+                    <div className="py-10 text-center text-slate-400">
+                      <ChartPieIcon className="h-12 w-12 mx-auto mb-3 text-slate-200" />
+                      <p>Belum ada data pembayaran tercatat.</p>
+                    </div>
+                  ) : (
+                    methodsChart.map(m => (
+                      <div key={m.method} className="space-y-2">
+                        <div className="flex justify-between text-sm font-semibold">
+                          <span className="text-slate-700">{m.method} <span className="text-slate-400 font-normal">({m.count} trx)</span></span>
+                          <span className="text-slate-900">{m.percentage.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2.5">
+                          <div className="bg-orange-500 h-2.5 rounded-full" style={{ width: `${m.percentage}%` }}></div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "Settings" && (
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6 max-w-2xl">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                <div className="h-10 w-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                  <CogIcon className="h-5 w-5" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Pengaturan Toko Umum</h3>
+              </div>
+              <form onSubmit={handleUpdateSettings} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-slate-700">Nama Toko</label>
+                  <input
+                    type="text"
+                    value={settingStoreName}
+                    onChange={e => setSettingStoreName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-orange-500 text-sm"
+                    required
+                  />
+                  <p className="text-xs text-slate-500">Nama toko ini akan tampil di Nota, Dashboard Kasir, dan halaman Login.</p>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <label className="block text-sm font-semibold text-slate-700">Logo Toko (Opsional)</label>
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden shrink-0">
+                      {settingStoreLogo ? (
+                        <img src={settingStoreLogo} alt="Logo" className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="text-xs text-slate-400 text-center px-1">Tanpa Logo</span>
+                      )}
+                    </div>
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg"
+                        onChange={handleLogoUpload}
+                        className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">Maksimal 500KB. Format: JPG/PNG.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow-sm transition-colors text-sm"
+                  >
+                    Simpan Perubahan
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 

@@ -21,6 +21,7 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
 
   const [storeName, setStoreName] = useState("Memuat...");
   const [errorMsg, setErrorMsg] = useState("");
+  const [storeLogo, setStoreLogo] = useState("");
   const [storeExists, setStoreExists] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -30,7 +31,11 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
         const storeSnap = await getDoc(storeRef);
 
         if (storeSnap.exists()) {
-          setStoreName(storeSnap.data().name);
+          const data = storeSnap.data();
+          setStoreName(data.name);
+          if (data.logoBase64) {
+            setStoreLogo(data.logoBase64);
+          }
           setStoreExists(true);
         } else {
           setStoreName("Toko Tidak Ditemukan");
@@ -60,12 +65,15 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
       // Login menggunakan Firebase Auth
       await signInWithEmailAndPassword(auth, email, password);
 
-      // Simpan sesi di localStorage
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userEmail", email);
-      localStorage.setItem("userRole", loginRole);
-      localStorage.setItem("storeSlug", storeSlug);
-      localStorage.setItem("storeName", storeName);
+      // Simpan sesi di sessionStorage
+      sessionStorage.setItem("isLoggedIn", "true");
+      sessionStorage.setItem("userEmail", email);
+      sessionStorage.setItem("userRole", loginRole);
+      sessionStorage.setItem("storeSlug", storeSlug);
+      sessionStorage.setItem("storeName", storeName);
+      if (storeLogo) {
+        sessionStorage.setItem("storeLogo", storeLogo);
+      }
 
       if (loginRole === "Kasir") {
         router.push(`/${storeSlug}/dashboard/cashier`);
