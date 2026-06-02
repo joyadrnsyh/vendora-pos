@@ -81,7 +81,6 @@ export default function Navbar() {
                 </button>
 
 
-                {/* Desktop Menu */}
                 <ul className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
                     <li>
                         <a
@@ -96,22 +95,11 @@ export default function Navbar() {
 
                     <li>
                         <a
-                            href="#about"
-                            onClick={(e) => handleScroll(e, "about")}
-                            className="relative py-1 group transition hover:text-orange-600"
-                        >
-                            Tentang Kami
-                            <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-orange-600 transition-all duration-300 group-hover:w-full"></span>
-                        </a>
-                    </li>
-
-                    <li>
-                        <a
                             href="#services"
                             onClick={(e) => handleScroll(e, "services")}
                             className="relative py-1 group transition hover:text-orange-600"
                         >
-                            Layanan
+                            Fitur
                             <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-orange-600 transition-all duration-300 group-hover:w-full"></span>
                         </a>
                     </li>
@@ -122,7 +110,7 @@ export default function Navbar() {
                             onClick={(e) => handleScroll(e, "portfolio")}
                             className="relative py-1 group transition hover:text-orange-600"
                         >
-                            Portofolio
+                            Bisnis
                             <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-orange-600 transition-all duration-300 group-hover:w-full"></span>
                         </a>
                     </li>
@@ -133,7 +121,18 @@ export default function Navbar() {
                             onClick={(e) => handleScroll(e, "pricing")}
                             className="relative py-1 group transition hover:text-orange-600"
                         >
-                            Paket Harga
+                            Harga
+                            <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-orange-600 transition-all duration-300 group-hover:w-full"></span>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a
+                            href="#faq"
+                            onClick={(e) => handleScroll(e, "faq")}
+                            className="relative py-1 group transition hover:text-orange-600"
+                        >
+                            FAQ
                             <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-orange-600 transition-all duration-300 group-hover:w-full"></span>
                         </a>
                     </li>
@@ -181,20 +180,11 @@ export default function Navbar() {
                         </li>
                         <li>
                             <a
-                                href="#about"
-                                onClick={(e) => handleScroll(e, "about")}
-                                className="block py-2 hover:text-orange-600 transition"
-                            >
-                                Tentang Kami
-                            </a>
-                        </li>
-                        <li>
-                            <a
                                 href="#services"
                                 onClick={(e) => handleScroll(e, "services")}
                                 className="block py-2 hover:text-orange-600 transition"
                             >
-                                Layanan
+                                Fitur
                             </a>
                         </li>
                         <li>
@@ -203,7 +193,7 @@ export default function Navbar() {
                                 onClick={(e) => handleScroll(e, "portfolio")}
                                 className="block py-2 hover:text-orange-600 transition"
                             >
-                                Portofolio
+                                Bisnis
                             </a>
                         </li>
                         <li>
@@ -212,7 +202,16 @@ export default function Navbar() {
                                 onClick={(e) => handleScroll(e, "pricing")}
                                 className="block py-2 hover:text-orange-600 transition"
                             >
-                                Paket Harga
+                                Harga
+                            </a>
+                        </li>
+                        <li>
+                            <a
+                                href="#faq"
+                                onClick={(e) => handleScroll(e, "faq")}
+                                className="block py-2 hover:text-orange-600 transition"
+                            >
+                                FAQ
                             </a>
                         </li>
                         <li className="pt-2 border-t border-slate-100 sm:hidden">

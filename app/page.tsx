@@ -1,5 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 import React from "react";
 import Link from "next/link";
+import { BoltIcon, CubeIcon, ChartBarIcon, GlobeAltIcon } from "@heroicons/react/24/outline";
 import "./globals.css";
 
 export default function Home() {
@@ -73,8 +75,8 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-16">
             {/* Feature 1 */}
             <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 text-left space-y-4">
-              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-2xl text-orange-600 font-bold">
-                ⚡
+              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-600">
+                <BoltIcon className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-zinc-950">Transaksi Instan</h3>
               <p className="text-zinc-500 text-sm leading-relaxed">
@@ -84,8 +86,8 @@ export default function Home() {
 
             {/* Feature 2 */}
             <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 text-left space-y-4">
-              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-2xl text-orange-600 font-bold">
-                📦
+              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-600">
+                <CubeIcon className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-zinc-950">Kelola Stok Otomatis</h3>
               <p className="text-zinc-500 text-sm leading-relaxed">
@@ -95,8 +97,8 @@ export default function Home() {
 
             {/* Feature 3 */}
             <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 text-left space-y-4">
-              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-2xl text-orange-600 font-bold">
-                📈
+              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-600">
+                <ChartBarIcon className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-zinc-950">Laporan Finansial</h3>
               <p className="text-zinc-500 text-sm leading-relaxed">
@@ -106,8 +108,8 @@ export default function Home() {
 
             {/* Feature 4 */}
             <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 text-left space-y-4">
-              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-2xl text-orange-600 font-bold">
-                🌐
+              <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-600">
+                <GlobeAltIcon className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-zinc-950">Dukungan Multi-Outlet</h3>
               <p className="text-zinc-500 text-sm leading-relaxed">
@@ -138,9 +140,9 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Business 1 */}
             <div className="group rounded-3xl overflow-hidden border border-zinc-200/60 bg-zinc-50 hover:bg-white hover:shadow-xl transition-all duration-300">
-              <div className="h-48 bg-gradient-to-tr from-amber-600 to-orange-400 p-8 flex items-center justify-center relative overflow-hidden">
-                <span className="text-7xl group-hover:scale-110 transition-transform duration-300">☕🥐</span>
-                <div className="absolute inset-0 bg-black/10" />
+              <div className="h-48 bg-zinc-100 flex items-center justify-center relative overflow-hidden">
+                <img src="/cafe_illustration.png" alt="Kafe dan F&B" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
               <div className="p-6 space-y-2">
                 <h3 className="text-lg font-bold text-zinc-950">Kafe & F&B</h3>
@@ -152,9 +154,9 @@ export default function Home() {
 
             {/* Business 2 */}
             <div className="group rounded-3xl overflow-hidden border border-zinc-200/60 bg-zinc-50 hover:bg-white hover:shadow-xl transition-all duration-300">
-              <div className="h-48 bg-gradient-to-tr from-orange-600 to-red-400 p-8 flex items-center justify-center relative overflow-hidden">
-                <span className="text-7xl group-hover:scale-110 transition-transform duration-300">🛍️👕</span>
-                <div className="absolute inset-0 bg-black/10" />
+              <div className="h-48 bg-zinc-100 flex items-center justify-center relative overflow-hidden">
+                <img src="/retail_illustration.png" alt="Ritel dan Minimarket" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
               <div className="p-6 space-y-2">
                 <h3 className="text-lg font-bold text-zinc-950">Ritel & Minimarket</h3>
@@ -166,9 +168,9 @@ export default function Home() {
 
             {/* Business 3 */}
             <div className="group rounded-3xl overflow-hidden border border-zinc-200/60 bg-zinc-50 hover:bg-white hover:shadow-xl transition-all duration-300">
-              <div className="h-48 bg-gradient-to-tr from-red-600 to-pink-500 p-8 flex items-center justify-center relative overflow-hidden">
-                <span className="text-7xl group-hover:scale-110 transition-transform duration-300">💈💇</span>
-                <div className="absolute inset-0 bg-black/10" />
+              <div className="h-48 bg-zinc-100 flex items-center justify-center relative overflow-hidden">
+                <img src="/salon_illustration.png" alt="Jasa dan Salon" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
               <div className="p-6 space-y-2">
                 <h3 className="text-lg font-bold text-zinc-950">Jasa & Salon</h3>
@@ -296,6 +298,46 @@ export default function Home() {
               >
                 Hubungi Kami
               </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-24 bg-white border-t border-zinc-100">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold mb-4">
+              Pusat Bantuan
+            </div>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-zinc-950 tracking-tight">
+              Pertanyaan yang Sering Diajukan
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {/* FAQ 1 */}
+            <div className="p-6 rounded-2xl bg-zinc-50 border border-zinc-200/60 hover:border-orange-200 transition-colors">
+              <h3 className="text-lg font-bold text-zinc-900 mb-2">Apakah ada batasan perangkat?</h3>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Aplikasi kami dirancang responsif dan fleksibel. Anda dapat mengakses dashboard dan mode kasir di segala perangkat mulai dari Smartphone, Tablet (iPad/Android), hingga PC & Laptop tanpa perlu instalasi aplikasi khusus.
+              </p>
+            </div>
+            
+            {/* FAQ 2 */}
+            <div className="p-6 rounded-2xl bg-zinc-50 border border-zinc-200/60 hover:border-orange-200 transition-colors">
+              <h3 className="text-lg font-bold text-zinc-900 mb-2">Bisakah saya menggunakan aplikasi ini tanpa internet (Offline)?</h3>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Saat ini Vendora POS adalah sistem Point of Sale berbasis Cloud (Cloud POS) modern. Ini berarti Anda membutuhkan koneksi internet stabil (bisa menggunakan seluler) agar data penjualan dan stok bisa tersinkronisasi secara real-time.
+              </p>
+            </div>
+
+            {/* FAQ 3 */}
+            <div className="p-6 rounded-2xl bg-zinc-50 border border-zinc-200/60 hover:border-orange-200 transition-colors">
+              <h3 className="text-lg font-bold text-zinc-900 mb-2">Apakah sistem mendukung printer struk thermal?</h3>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Ya! Vendora POS didesain khusus agar kompatibel dengan fitur Print bawaan OS Anda. Cukup hubungkan perangkat Anda ke printer Thermal Bluetooth atau USB, dan struk belanja akan tercetak sempurna.
+              </p>
             </div>
           </div>
         </div>
