@@ -54,6 +54,13 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Tunai");
 
+  // Notifikasi
+  const [toastMsg, setToastMsg] = useState("");
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 4000);
+  };
+
   useEffect(() => {
     const storedStore = sessionStorage.getItem("storeName") || storeSlug.replace(/-/g, " ").toUpperCase();
     const storedUser = sessionStorage.getItem("userName") || "Kasir Vendora";
@@ -201,6 +208,7 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
       // Sukses
       setIsCheckoutModalOpen(false);
       setCheckoutSuccess(true);
+      showToast("Penjualan berhasil dicatat!");
     } catch (error) {
       console.error("Gagal melakukan checkout:", error);
       alert("Terjadi kesalahan saat memproses pembayaran.");
@@ -209,6 +217,15 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
 
   return (
     <main className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 h-screen overflow-hidden">
+      {/* Global Toast */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl z-50 flex items-center gap-3">
+          <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-sm font-semibold">{toastMsg}</span>
+        </div>
+      )}
       {/* Top Navbar */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">

@@ -131,6 +131,16 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const [userForm, setUserForm] = useState({ name: "", email: "", password: "", role: "Kasir" as "Admin" | "Kasir", status: "Aktif" as "Aktif" | "Nonaktif" });
 
+  // Notifikasi
+  const [toastMsg, setToastMsg] = useState("");
+  const [notifications, setNotifications] = useState<{id: string, msg: string, time: Date}[]>([]);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 4000);
+  };
+
   useEffect(() => {
     // Ambil detail sesi
     const storedStore = sessionStorage.getItem("storeName") || storeSlug.replace(/-/g, " ").toUpperCase();
@@ -191,7 +201,15 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
     const channel = supabase.channel('admin-dashboard-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions', filter: `store_slug=eq.${storeSlug}` }, (payload) => {
+         const newTx = payload.new as any;
+         const msg = `Penjualan baru: Rp ${newTx.total.toLocaleString("id-ID")} oleh ${newTx.customer_name || 'Pelanggan'}`;
+         setNotifications(prev => [{ id: newTx.id, msg, time: new Date() }, ...prev]);
+         showToast("Ada " + msg);
+         fetchAllData();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'transactions', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stores', filter: `slug=eq.${storeSlug}` }, fetchAllData)
       .subscribe();
 
@@ -228,6 +246,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
           stock: prodForm.stock,
           min_stock: prodForm.minStock
         }).eq("id", editingProduct.id);
+        showToast("Produk berhasil diperbarui!");
       } else {
         await supabase.from("products").insert({
           store_slug: storeSlug,
@@ -237,6 +256,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
           stock: prodForm.stock,
           min_stock: prodForm.minStock
         });
+        showToast("Produk baru berhasil ditambahkan!");
       }
       setIsProductModalOpen(false);
     } catch (error) {
@@ -249,6 +269,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
     if (confirm("Apakah Anda yakin ingin menghapus produk ini?")) {
       try {
         await supabase.from("products").delete().eq("id", id);
+        showToast("Produk berhasil dihapus!");
       } catch (error) {
         console.error("Gagal menghapus produk:", error);
       }
@@ -277,6 +298,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
           role: userForm.role,
           status: userForm.status
         }).eq("id", editingUser.id);
+        showToast("Pengguna berhasil diperbarui!");
       } else {
         const dummyEmail = `${userForm.email.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendora.local`;
         await supabase.auth.signUp({ email: dummyEmail, password: userForm.password });
@@ -288,6 +310,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
           role: userForm.role,
           status: userForm.status
         });
+        showToast("Pengguna baru berhasil ditambahkan!");
       }
       setIsUserModalOpen(false);
     } catch (error: any) {
@@ -300,6 +323,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
     if (confirm("Apakah Anda yakin ingin menghapus pengguna ini?")) {
       try {
         await supabase.from("users").delete().eq("id", id);
+        showToast("Pengguna berhasil dihapus!");
       } catch (error) {
         console.error("Gagal menghapus pengguna:", error);
       }
@@ -317,7 +341,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
       sessionStorage.setItem("storeLogo", settingStoreLogo);
       setStoreName(settingStoreName);
       setStoreLogo(settingStoreLogo);
-      alert("Pengaturan toko berhasil diperbarui!");
+      showToast("Pengaturan toko berhasil diperbarui!");
     } catch (err: any) {
       alert("Gagal memperbarui toko: " + err.message);
     }
@@ -424,14 +448,60 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
             </h2>
           </div>
           <div className="flex items-center gap-5">
-            <button className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
-              <BellIcon className="h-6 w-6" />
-              {lowStockCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white" />
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifMenu(!showNotifMenu)}
+                className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <BellIcon className="h-6 w-6" />
+                {(lowStockCount > 0 || notifications.length > 0) && (
+                  <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white" />
+                )}
+              </button>
+              
+              {showNotifMenu && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50">
+                  <div className="p-4 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-900">Notifikasi</h3>
+                    {notifications.length > 0 && (
+                      <button onClick={() => setNotifications([])} className="text-xs text-orange-600 hover:underline">
+                        Bersihkan
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {lowStockCount > 0 && (
+                      <div className="p-4 border-b border-slate-50 flex gap-3 text-red-600 bg-red-50/30">
+                        <ExclamationTriangleIcon className="h-5 w-5 shrink-0 mt-0.5" />
+                        <div className="text-sm">Ada <b>{lowStockCount}</b> produk yang stoknya menipis!</div>
+                      </div>
+                    )}
+                    {notifications.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-slate-500">Belum ada notifikasi baru.</div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className="p-4 border-b border-slate-50 flex flex-col gap-1 hover:bg-slate-50">
+                          <span className="text-sm text-slate-800">{n.msg}</span>
+                          <span className="text-xs text-slate-400">{n.time.toLocaleTimeString()}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
           </div>
         </header>
+
+        {/* Global Toast */}
+        {toastMsg && (
+          <div className="fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl z-50 flex items-center gap-3">
+            <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-semibold">{toastMsg}</span>
+          </div>
+        )}
 
         {/* Dashboard Body */}
         <div className="flex-1 overflow-y-auto p-8 space-y-8">

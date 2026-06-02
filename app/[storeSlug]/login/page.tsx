@@ -71,24 +71,65 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
     try {
       // Login menggunakan Supabase Auth
       const dummyEmail = `${username.toLowerCase().replace(/[^a-z0-9]/g, '')}@vendora.local`;
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: dummyEmail,
         password,
       });
 
       if (error) throw error;
+      const user = data.user;
+
+      // Verifikasi Peran (Role) pengguna di database
+      let actualRole = "Kasir";
+
+      // 1. Apakah dia pemilik toko (Owner)?
+      const { data: storeOwner } = await supabase
+        .from("stores")
+        .select("owner_uid")
+        .eq("slug", storeSlug)
+        .eq("owner_uid", user.id)
+        .single();
+
+      if (storeOwner) {
+        actualRole = "Admin";
+      } else {
+        // 2. Jika bukan owner, cek tabel users (Karyawan)
+        const { data: employee, error: empError } = await supabase
+          .from("users")
+          .select("role, status")
+          .eq("store_slug", storeSlug)
+          .eq("email", username) // kolom email menyimpan username
+          .single();
+
+        if (empError || !employee) {
+          await supabase.auth.signOut();
+          throw new Error("Akun Anda tidak terdaftar di toko ini.");
+        }
+        if (employee.status === "Nonaktif") {
+          await supabase.auth.signOut();
+          throw new Error("Akun Anda sedang dinonaktifkan oleh Admin.");
+        }
+        actualRole = employee.role;
+      }
+
+      // Validasi Akses: Kasir tidak boleh masuk ke panel Admin
+      if (loginRole === "Admin" && actualRole !== "Admin") {
+        await supabase.auth.signOut();
+        throw new Error("Akses ditolak: Anda tidak memiliki hak akses sebagai Admin.");
+      }
 
       // Simpan sesi di sessionStorage
       sessionStorage.setItem("isLoggedIn", "true");
       sessionStorage.setItem("userEmail", username);
-      sessionStorage.setItem("userRole", loginRole);
+      sessionStorage.setItem("userRole", actualRole); // Gunakan peran asli dari DB
       sessionStorage.setItem("storeSlug", storeSlug);
       sessionStorage.setItem("storeName", storeName);
       if (storeLogo) {
         sessionStorage.setItem("storeLogo", storeLogo);
       }
 
-      if (loginRole === "Kasir") {
+      // Redirect sesuai peran asli
+      if (actualRole === "Kasir" || loginRole === "Kasir") {
         router.push(`/${storeSlug}/dashboard/cashier`);
       } else {
         router.push(`/${storeSlug}/dashboard/admin`);
