@@ -42,6 +42,7 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
   const [storeName, setStoreName] = useState("");
   const [userName, setUserName] = useState("");
   const [storeLogo, setStoreLogo] = useState("");
+  const [currentDate, setCurrentDate] = useState("");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -61,6 +62,7 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
     setStoreName(storedStore);
     setUserName(storedUser);
     setStoreLogo(storedLogo);
+    setCurrentDate(new Date().toLocaleString('id-ID'));
 
     // Fetch Products Real-time
     const qProducts = query(collection(db, "stores", storeSlug, "products"));
@@ -470,7 +472,7 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
             <div className="font-bold text-lg mb-1">{storeName}</div>
           )}
           <div className="text-xs">Kasir: {userName}</div>
-          <div className="text-xs">{new Date().toLocaleString('id-ID')}</div>
+          <div className="text-xs">{currentDate}</div>
         </div>
         
         <div className="text-xs mb-2 pb-2 border-b border-black border-dashed">
