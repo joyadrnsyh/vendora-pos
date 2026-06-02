@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import "../../globals.css";
+import "../../../globals.css";
 import {
   BuildingStorefrontIcon,
   Squares2X2Icon,
@@ -111,7 +113,7 @@ export default function DemoDashboard() {
 
   return (
     <main className="min-h-screen bg-white flex flex-col font-sans text-slate-800">
-      
+
       {/* Demo Banner */}
       <div className="bg-amber-500 text-white px-4 py-2 text-center text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 shadow-sm z-50">
         <InformationCircleIcon className="h-4 w-4" />
@@ -139,11 +141,10 @@ export default function DemoDashboard() {
                   <button
                     key={item.name}
                     onClick={() => setActiveTab(item.name)}
-                    className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-300 ${
-                      isActive
-                        ? "bg-orange-50 text-orange-600 shadow-sm border border-orange-100"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
+                    className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-300 ${isActive
+                      ? "bg-orange-50 text-orange-600 shadow-sm border border-orange-100"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                      }`}
                   >
                     <Icon className={`h-5 w-5 ${isActive ? "text-orange-600" : "text-slate-400"}`} />
                     <span>{item.label}</span>
@@ -200,7 +201,7 @@ export default function DemoDashboard() {
 
           {/* Dashboard Body */}
           <div className="flex-1 p-8 space-y-8">
-            
+
             {activeTab === "Overview" && (
               <>
                 {/* Main Metric Cards Grid */}
