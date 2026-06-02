@@ -18,9 +18,8 @@ import {
   PrinterIcon
 } from "@heroicons/react/24/outline";
 
-// Firebase imports
-import { db } from "../../../../lib/firebase";
-import { collection, query, onSnapshot, addDoc, doc, writeBatch } from "firebase/firestore";
+// Supabase imports
+import { supabase } from "../../../../lib/supabase";
 
 interface Product {
   id: string;
@@ -64,18 +63,33 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
     setStoreLogo(storedLogo);
     setCurrentDate(new Date().toLocaleString('id-ID'));
 
-    // Fetch Products Real-time
-    const qProducts = query(collection(db, "stores", storeSlug, "products"));
-    const unsubscribeProducts = onSnapshot(qProducts, (querySnapshot) => {
-      const prods: Product[] = [];
-      querySnapshot.forEach((doc) => {
-        prods.push({ ...(doc.data() as Product), id: doc.id });
-      });
-      setProducts(prods);
-    });
+    const fetchProducts = async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_slug', storeSlug);
+
+      if (data) {
+        setProducts(data.map(d => ({
+          id: d.id,
+          name: d.name,
+          category: d.category,
+          price: d.price,
+          stock: d.stock,
+          minStock: d.min_stock
+        })));
+      } else if (error) {
+        console.error("Error fetching products:", error);
+      }
+    };
+    fetchProducts();
+
+    const channel = supabase.channel('cashier-products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `store_slug=eq.${storeSlug}` }, fetchProducts)
+      .subscribe();
 
     return () => {
-      unsubscribeProducts();
+      supabase.removeChannel(channel);
     };
   }, [storeSlug]);
 
@@ -155,31 +169,34 @@ export default function CashierDashboard({ params }: { params: Promise<{ storeSl
 
     try {
       // 1. Catat Transaksi
-      const transactionData = {
-        customer: customerName,
-        date: new Date().toISOString(),
+      const { data: transaction, error: tError } = await supabase.from("transactions").insert({
+        store_slug: storeSlug,
+        customer_name: customerName,
         total: total,
         method: paymentMethod,
         status: "Sukses",
-        items: cart.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        })),
-        cashierName: userName
-      };
+        cashier_name: userName
+      }).select().single();
 
-      await addDoc(collection(db, "stores", storeSlug, "transactions"), transactionData);
+      if (tError) throw tError;
 
-      // 2. Potong Stok (Batch Write)
-      const batch = writeBatch(db);
-      cart.forEach((item) => {
-        const productRef = doc(db, "stores", storeSlug, "products", item.id);
+      // 1b. Catat Transaction Items
+      const tItems = cart.map(item => ({
+        transaction_id: transaction.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.price
+      }));
+      
+      const { error: iError } = await supabase.from("transaction_items").insert(tItems);
+      if (iError) throw iError;
+
+      // 2. Potong Stok (Secara berurutan, dalam produksi nyata disarankan pakai RPC di postgres)
+      for (const item of cart) {
         const newStock = item.stock - item.quantity;
-        batch.update(productRef, { stock: newStock });
-      });
-      await batch.commit();
+        const { error: sError } = await supabase.from("products").update({ stock: newStock }).eq("id", item.id);
+        if (sError) console.error("Error updating stock for", item.name, sError);
+      }
 
       // Sukses
       setIsCheckoutModalOpen(false);

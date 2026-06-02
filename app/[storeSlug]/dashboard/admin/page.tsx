@@ -31,11 +31,8 @@ import {
   LockClosedIcon
 } from "@heroicons/react/24/outline";
 
-// Firebase imports
-import app, { db } from "../../../../lib/firebase";
-import { initializeApp, deleteApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-import { collection, query, onSnapshot, addDoc, deleteDoc, updateDoc, doc } from "firebase/firestore";
+// Supabase imports
+import { supabase } from "../../../../lib/supabase";
 
 interface Product {
   id: string;
@@ -145,59 +142,61 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
     setStoreLogo(storedLogo);
     setSettingStoreLogo(storedLogo);
 
-    // Fetch Products Real-time
-    const qProducts = query(collection(db, "stores", storeSlug, "products"));
-    const unsubscribeProducts = onSnapshot(qProducts, (querySnapshot) => {
-      const prods: Product[] = [];
-      let lowCount = 0;
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as Product;
-        prods.push({ ...data, id: doc.id });
-        if (data.stock <= data.minStock) lowCount++;
-      });
-      setProducts(prods);
-      setLowStockCount(lowCount);
-    });
+    const fetchAllData = async () => {
+      try {
+        const [
+          { data: pData },
+          { data: uData },
+          { data: tData },
+          { data: sData }
+        ] = await Promise.all([
+          supabase.from('products').select('*').eq('store_slug', storeSlug),
+          supabase.from('users').select('*').eq('store_slug', storeSlug),
+          supabase.from('transactions').select('*').eq('store_slug', storeSlug).order('created_at', { ascending: false }),
+          supabase.from('stores').select('*').eq('slug', storeSlug).single()
+        ]);
 
-    // Fetch Employees Real-time
-    const qUsers = query(collection(db, "stores", storeSlug, "employees"));
-    const unsubscribeUsers = onSnapshot(qUsers, (querySnapshot) => {
-      const emps: SystemUser[] = [];
-      querySnapshot.forEach((doc) => {
-        emps.push({ ...(doc.data() as SystemUser), id: doc.id });
-      });
-      setUsers(emps);
-    });
-
-    // Fetch Store Details (Plan & Logo) Real-time
-    const unsubscribeStore = onSnapshot(doc(db, "stores", storeSlug), (docSnapshot) => {
-      if (docSnapshot.exists()) {
-        const data = docSnapshot.data();
-        setStorePlan(data.plan || "Uji Coba 14 Hari");
-        if (data.logoBase64) {
-          setStoreLogo(data.logoBase64);
-          sessionStorage.setItem("storeLogo", data.logoBase64);
+        if (pData) {
+          const prods = pData.map(d => ({
+            id: d.id, name: d.name, category: d.category, price: d.price, stock: d.stock, minStock: d.min_stock
+          }));
+          setProducts(prods);
+          setLowStockCount(prods.filter(p => p.stock <= p.minStock).length);
         }
+        if (uData) {
+          setUsers(uData.map(d => ({
+            id: d.id, name: d.name, email: d.email, role: d.role as any, status: d.status as any
+          })));
+        }
+        if (tData) {
+          setTransactions(tData.map(d => ({
+            id: d.id, customer: d.customer_name || "", date: d.created_at, total: d.total, method: d.method, status: d.status as any
+          })));
+        }
+        if (sData) {
+          setStorePlan(sData.plan || "Uji Coba 14 Hari");
+          if (sData.logo_base64) {
+            setStoreLogo(sData.logo_base64);
+            sessionStorage.setItem("storeLogo", sData.logo_base64);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
       }
-    });
+    };
 
-    // Fetch Transactions Real-time
-    const qTransactions = query(collection(db, "stores", storeSlug, "transactions"));
-    const unsubscribeTransactions = onSnapshot(qTransactions, (querySnapshot) => {
-      const trans: Transaction[] = [];
-      querySnapshot.forEach((doc) => {
-        trans.push({ ...(doc.data() as Transaction), id: doc.id });
-      });
-      // Sort by date descending
-      trans.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setTransactions(trans);
-    });
+    fetchAllData();
+
+    // Supabase Realtime Subscriptions
+    const channel = supabase.channel('admin-dashboard-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `store_slug=eq.${storeSlug}` }, fetchAllData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stores', filter: `slug=eq.${storeSlug}` }, fetchAllData)
+      .subscribe();
 
     return () => {
-      unsubscribeProducts();
-      unsubscribeUsers();
-      unsubscribeTransactions();
-      unsubscribeStore();
+      supabase.removeChannel(channel);
     };
   }, [storeSlug]);
 
@@ -222,10 +221,22 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
     e.preventDefault();
     try {
       if (editingProduct) {
-        const docRef = doc(db, "stores", storeSlug, "products", editingProduct.id);
-        await updateDoc(docRef, prodForm);
+        await supabase.from("products").update({
+          name: prodForm.name,
+          category: prodForm.category,
+          price: prodForm.price,
+          stock: prodForm.stock,
+          min_stock: prodForm.minStock
+        }).eq("id", editingProduct.id);
       } else {
-        await addDoc(collection(db, "stores", storeSlug, "products"), prodForm);
+        await supabase.from("products").insert({
+          store_slug: storeSlug,
+          name: prodForm.name,
+          category: prodForm.category,
+          price: prodForm.price,
+          stock: prodForm.stock,
+          min_stock: prodForm.minStock
+        });
       }
       setIsProductModalOpen(false);
     } catch (error) {
@@ -237,7 +248,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
   const handleDeleteProduct = async (id: string) => {
     if (confirm("Apakah Anda yakin ingin menghapus produk ini?")) {
       try {
-        await deleteDoc(doc(db, "stores", storeSlug, "products", id));
+        await supabase.from("products").delete().eq("id", id);
       } catch (error) {
         console.error("Gagal menghapus produk:", error);
       }
@@ -260,25 +271,17 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
     e.preventDefault();
     try {
       if (editingUser) {
-        const docRef = doc(db, "stores", storeSlug, "employees", editingUser.id);
-        await updateDoc(docRef, {
+        await supabase.from("users").update({
           name: userForm.name,
           email: userForm.email,
           role: userForm.role,
           status: userForm.status
-        });
+        }).eq("id", editingUser.id);
       } else {
-        // Create auth account silently using a uniquely named secondary app to avoid app-deleted errors
-        const uniqueAppName = "SecondaryApp_" + Date.now();
-        const secondaryApp = initializeApp(app.options, uniqueAppName);
-        const secondaryAuth = getAuth(secondaryApp);
+        await supabase.auth.signUp({ email: userForm.email, password: userForm.password });
 
-        await createUserWithEmailAndPassword(secondaryAuth, userForm.email, userForm.password);
-        await signOut(secondaryAuth);
-        await deleteApp(secondaryApp);
-
-        // Add to firestore
-        await addDoc(collection(db, "stores", storeSlug, "employees"), {
+        await supabase.from("users").insert({
+          store_slug: storeSlug,
           name: userForm.name,
           email: userForm.email,
           role: userForm.role,
@@ -295,7 +298,7 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
   const handleDeleteUser = async (id: string) => {
     if (confirm("Apakah Anda yakin ingin menghapus pengguna ini?")) {
       try {
-        await deleteDoc(doc(db, "stores", storeSlug, "employees", id));
+        await supabase.from("users").delete().eq("id", id);
       } catch (error) {
         console.error("Gagal menghapus pengguna:", error);
       }
@@ -305,10 +308,10 @@ export default function AdminDashboard({ params }: { params: Promise<{ storeSlug
   const handleUpdateSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateDoc(doc(db, "stores", storeSlug), {
+      await supabase.from("stores").update({
         name: settingStoreName,
         logoBase64: settingStoreLogo
-      });
+      }).eq("slug", storeSlug);
       sessionStorage.setItem("storeName", settingStoreName);
       sessionStorage.setItem("storeLogo", settingStoreLogo);
       setStoreName(settingStoreName);
@@ -1069,3 +1072,11 @@ function itemLabel(name: string, nav: any[]) {
   const f = nav.find(n => n.name === name);
   return f ? f.label : name;
 }
+function updateDoc(arg0: any, arg1: { name: string; logoBase64: string; }) {
+  throw new Error("Function not implemented.");
+}
+
+function doc(db: any, arg1: string, storeSlug: string): any {
+  throw new Error("Function not implemented.");
+}
+

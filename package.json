@@ -11,8 +11,9 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@material-tailwind/react": "^2.1.10",
-    "firebase": "^12.14.0",
+    "@supabase/supabase-js": "^2.107.0",
     "next": "16.2.7",
+    "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "three": "^0.184.0"

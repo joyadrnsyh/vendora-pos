@@ -5,10 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import "../globals.css";
 
-// Firebase imports
-import { auth, googleProvider, db } from "../../lib/firebase";
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, query, where, getDocs } from "firebase/firestore";
+// Supabase imports
+import { supabase } from "../../lib/supabase";
 
 function AuthForm() {
   const router = useRouter();
@@ -30,13 +28,20 @@ function AuthForm() {
 
   const checkUserStoreAndRedirect = async (uid: string, userEmail: string | null) => {
     // Cari toko yang dimiliki oleh uid ini
-    const q = query(collection(db, "stores"), where("ownerUid", "==", uid));
-    const querySnapshot = await getDocs(q);
+    const { data: stores, error } = await supabase
+      .from("stores")
+      .select("*")
+      .eq("owner_uid", uid);
 
-    if (!querySnapshot.empty) {
+    if (error) {
+      console.error("Error fetching stores:", error);
+      setErrorMsg("Gagal memeriksa data toko.");
+      return;
+    }
+
+    if (stores && stores.length > 0) {
       // Toko ditemukan
-      const storeDoc = querySnapshot.docs[0];
-      const storeData = storeDoc.data();
+      const storeData = stores[0];
       const slug = storeData.slug;
       
       sessionStorage.setItem("isLoggedIn", "true");
@@ -58,8 +63,15 @@ function AuthForm() {
     setIsLoading(true);
     setErrorMsg("");
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      await checkUserStoreAndRedirect(result.user.uid, result.user.email);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      if (error) throw error;
+      // Note: Supabase OAuth akan me-redirect halaman, jadi eksekusi di bawah ini mungkin tidak langsung jalan
+      // Pengecekan toko idealnya dilakukan di halaman callback atau melalui listener onAuthStateChange
     } catch (error: unknown) {
       console.error(error);
       setErrorMsg("Gagal login dengan Google: " + (error as Error).message);
@@ -75,12 +87,22 @@ function AuthForm() {
     try {
       if (isLogin) {
         // Mode Login
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        await checkUserStoreAndRedirect(userCredential.user.uid, userCredential.user.email);
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        await checkUserStoreAndRedirect(data.user.id, data.user.email ?? "");
       } else {
         // Mode Daftar Akun Baru (Tanpa isi toko dulu)
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await checkUserStoreAndRedirect(userCredential.user.uid, userCredential.user.email);
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        if (data.user) {
+          await checkUserStoreAndRedirect(data.user.id, data.user.email ?? "");
+        }
       }
     } catch (error: unknown) {
       console.error("Error during auth:", error);

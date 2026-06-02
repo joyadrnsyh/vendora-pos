@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import "../../globals.css";
 
-// Firebase imports
-import { auth, db } from "../../../lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+// Supabase imports
+import { supabase } from "../../../lib/supabase";
 
 // In Next.js 13+ App Router, params is a promise in newer versions, but we can treat it as a prop
 export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug: string }> }) {
@@ -27,14 +25,23 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
   useEffect(() => {
     const fetchStore = async () => {
       try {
-        const storeRef = doc(db, "stores", storeSlug);
-        const storeSnap = await getDoc(storeRef);
+        const { data, error } = await supabase
+          .from("stores")
+          .select("*")
+          .eq("slug", storeSlug)
+          .single();
 
-        if (storeSnap.exists()) {
-          const data = storeSnap.data();
+        if (error) {
+          console.error("Error fetching store:", error);
+          setStoreName(storeSlug.replace(/-/g, " ").toUpperCase());
+          setStoreExists(true); // Fallback if rules block it or network error
+          return;
+        }
+
+        if (data) {
           setStoreName(data.name);
-          if (data.logoBase64) {
-            setStoreLogo(data.logoBase64);
+          if (data.logo_base64) {
+            setStoreLogo(data.logo_base64);
           }
           setStoreExists(true);
         } else {
@@ -62,8 +69,13 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
     setErrorMsg("");
 
     try {
-      // Login menggunakan Firebase Auth
-      await signInWithEmailAndPassword(auth, email, password);
+      // Login menggunakan Supabase Auth
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
 
       // Simpan sesi di sessionStorage
       sessionStorage.setItem("isLoggedIn", "true");
@@ -80,10 +92,9 @@ export default function StoreLoginPage({ params }: { params: Promise<{ storeSlug
       } else {
         router.push(`/${storeSlug}/dashboard/admin`);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login error:", error);
-      setErrorMsg("Kredensial tidak valid: " + error.message);
+      setErrorMsg("Kredensial tidak valid: " + (error as Error).message);
     } finally {
       setIsLoading(false);
     }

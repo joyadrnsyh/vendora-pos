@@ -5,10 +5,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import "../globals.css";
 
-// Firebase imports
-import { auth, db } from "../../lib/firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+// Supabase imports
+import { supabase } from "../../lib/supabase";
 
 export default function SetupStorePage() {
   const router = useRouter();
@@ -19,16 +17,25 @@ export default function SetupStorePage() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
       } else {
-        // Jika belum login, kembalikan ke /Auth
-        router.push("/Auth");
+        router.push("/auth");
+      }
+    };
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+      } else {
+        router.push("/auth");
       }
     });
 
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, [router]);
 
   const generateSlug = (name: string) => {
@@ -46,25 +53,34 @@ export default function SetupStorePage() {
       const slug = generateSlug(storeName);
 
       // 1. Cek apakah toko sudah ada
-      const storeRef = doc(db, "stores", slug);
-      const storeSnap = await getDoc(storeRef);
+      const { data: existingStore } = await supabase
+        .from("stores")
+        .select("slug")
+        .eq("slug", slug)
+        .single();
 
-      if (storeSnap.exists()) {
+      if (existingStore) {
         throw new Error("Nama toko ini sudah terdaftar. Silakan pilih nama lain.");
       }
+      
+      // abaikan checkError "PGRST116" (not found) karena itu berarti slug tersedia
 
-      // 2. Simpan data toko ke Firestore
+      // 2. Simpan data toko ke Supabase
       const plan = sessionStorage.getItem("planSubscribed") || "Uji Coba 14 Hari";
 
-      await setDoc(doc(db, "stores", slug), {
-        name: storeName,
-        slug: slug,
-        ownerName: ownerName,
-        ownerEmail: user.email,
-        ownerUid: user.uid,
-        createdAt: new Date().toISOString(),
-        plan: plan
-      });
+      const { error: insertError } = await supabase
+        .from("stores")
+        .insert({
+          slug: slug,
+          name: storeName,
+          owner_name: ownerName,
+          owner_email: user.email,
+          owner_uid: user.id,
+          plan: plan,
+          // created_at akan diisi otomatis oleh DB
+        });
+
+      if (insertError) throw insertError;
 
       // Simpan sesi lokal
       sessionStorage.setItem("isLoggedIn", "true");
