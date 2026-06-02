@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import "../../../globals.css";
 import {
@@ -15,68 +16,91 @@ import {
   XMarkIcon
 } from "@heroicons/react/24/outline";
 
+// Firebase imports
+import { db } from "../../../../lib/firebase";
+import { collection, query, onSnapshot, addDoc, doc, writeBatch } from "firebase/firestore";
+
 interface Product {
   id: string;
   name: string;
   category: string;
   price: number;
   stock: number;
-  image: string;
+  minStock: number;
 }
 
 interface CartItem extends Product {
   quantity: number;
 }
 
-const mockProducts: Product[] = [
-  { id: "p1", name: "Espresso", category: "Kopi", price: 15000, stock: 50, image: "☕" },
-  { id: "p2", name: "Americano", category: "Kopi", price: 18000, stock: 45, image: "☕" },
-  { id: "p3", name: "Cappuccino", category: "Kopi", price: 22000, stock: 30, image: "☕" },
-  { id: "p4", name: "Cafe Latte", category: "Kopi", price: 24000, stock: 35, image: "☕" },
-  { id: "p5", name: "Matcha Latte", category: "Non-Kopi", price: 25000, stock: 20, image: "🍵" },
-  { id: "p6", name: "Taro Latte", category: "Non-Kopi", price: 24000, stock: 15, image: "🍠" },
-  { id: "p7", name: "Lemon Tea", category: "Teh", price: 15000, stock: 40, image: "🍋" },
-  { id: "p8", name: "Croissant", category: "Makanan", price: 20000, stock: 10, image: "🥐" },
-  { id: "p9", name: "Brownies", category: "Makanan", price: 18000, stock: 12, image: "🍫" },
-];
-
 const categories = ["Semua", "Kopi", "Non-Kopi", "Teh", "Makanan"];
 
-export default function CashierDashboard() {
+export default function CashierDashboard({ params }: { params: Promise<{ storeSlug: string }> }) {
+  const { storeSlug } = use(params);
   const router = useRouter();
-  const [storeName, setStoreName] = useState("Toko Vendora");
-  const [userName, setUserName] = useState("Siti Nurhaliza");
 
+  const [storeName, setStoreName] = useState("Memuat...");
+  const [userName, setUserName] = useState("Kasir");
+
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
+  // Checkout Modal State
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("Tunai");
+
   useEffect(() => {
-    // Simulasi bypass login untuk sementara
-    const storedStore = localStorage.getItem("storeName") || "Vendora Store #01";
-    setTimeout(() => {
-      setStoreName(storedStore);
-      setUserName("Siti Kasir");
-    }, 0);
-  }, []);
+    const storedStore = localStorage.getItem("storeName") || storeSlug.replace(/-/g, " ").toUpperCase();
+    const storedUser = localStorage.getItem("userName") || "Kasir Vendora";
+    setStoreName(storedStore);
+    setUserName(storedUser);
+
+    // Fetch Products Real-time
+    const qProducts = query(collection(db, "stores", storeSlug, "products"));
+    const unsubscribeProducts = onSnapshot(qProducts, (querySnapshot) => {
+      const prods: Product[] = [];
+      querySnapshot.forEach((doc) => {
+        prods.push({ ...(doc.data() as Product), id: doc.id });
+      });
+      setProducts(prods);
+    });
+
+    return () => {
+      unsubscribeProducts();
+    };
+  }, [storeSlug]);
 
   const handleLogout = () => {
-    const slug = localStorage.getItem("storeSlug");
     localStorage.clear();
-    router.push(slug ? `/${slug}/login` : "/Auth");
+    router.push(storeSlug ? `/${storeSlug}/login` : "/Auth");
   };
 
-  const filteredProducts = mockProducts.filter((p) => {
+  // Extract unique categories from actual products or use defaults
+  const dynamicCategories = ["Semua", ...Array.from(new Set(products.map(p => p.category)))];
+
+  const filteredProducts = products.filter((p) => {
     const matchCategory = selectedCategory === "Semua" || p.category === selectedCategory;
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     return matchCategory && matchSearch;
   });
 
   const addToCart = (product: Product) => {
+    if (product.stock <= 0) {
+      alert("Stok produk ini habis!");
+      return;
+    }
+
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
+        if (existing.quantity >= product.stock) {
+          alert(`Maksimal stok untuk ${product.name} adalah ${product.stock}`);
+          return prev;
+        }
         return prev.map((item) =>
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -90,6 +114,10 @@ export default function CashierDashboard() {
       prev.map((item) => {
         if (item.id === id) {
           const newQty = item.quantity + delta;
+          if (newQty > item.stock) {
+            alert(`Maksimal stok adalah ${item.stock}`);
+            return item;
+          }
           return newQty > 0 ? { ...item, quantity: newQty } : item;
         }
         return item;
@@ -105,13 +133,57 @@ export default function CashierDashboard() {
   const tax = subtotal * 0.11; // 11% PPN
   const total = subtotal + tax;
 
-  const handleCheckout = () => {
+  const handleOpenCheckoutModal = () => {
     if (cart.length === 0) return;
-    setCheckoutSuccess(true);
-    setTimeout(() => {
-      setCart([]);
-      setCheckoutSuccess(false);
-    }, 3000);
+    setIsCheckoutModalOpen(true);
+    setCustomerName("Pelanggan Umum");
+    setPaymentMethod("Tunai");
+  };
+
+  const executeCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0) return;
+
+    try {
+      // 1. Catat Transaksi
+      const transactionData = {
+        customer: customerName,
+        date: new Date().toISOString(),
+        total: total,
+        method: paymentMethod,
+        status: "Sukses",
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        })),
+        cashierName: userName
+      };
+
+      await addDoc(collection(db, "stores", storeSlug, "transactions"), transactionData);
+
+      // 2. Potong Stok (Batch Write)
+      const batch = writeBatch(db);
+      cart.forEach((item) => {
+        const productRef = doc(db, "stores", storeSlug, "products", item.id);
+        const newStock = item.stock - item.quantity;
+        batch.update(productRef, { stock: newStock });
+      });
+      await batch.commit();
+
+      // Sukses
+      setIsCheckoutModalOpen(false);
+      setCheckoutSuccess(true);
+      setTimeout(() => {
+        setCart([]);
+        setCheckoutSuccess(false);
+      }, 3000);
+
+    } catch (error) {
+      console.error("Gagal melakukan checkout:", error);
+      alert("Terjadi kesalahan saat memproses pembayaran.");
+    }
   };
 
   return (
@@ -135,7 +207,7 @@ export default function CashierDashboard() {
 
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3 bg-slate-50 pl-3 pr-4 py-1.5 rounded-full border border-slate-200">
-            <div className="h-8 w-8 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 font-bold text-xs">
+            <div className="h-8 w-8 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 font-bold text-xs uppercase">
               {userName.charAt(0)}
             </div>
             <div className="text-sm font-semibold text-slate-700">{userName}</div>
@@ -171,13 +243,13 @@ export default function CashierDashboard() {
 
             {/* Category Filter */}
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
-              {categories.map((cat) => (
+              {dynamicCategories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
                   className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedCategory === cat
-                      ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    ? "bg-orange-600 text-white shadow-md shadow-orange-600/20"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
                     }`}
                 >
                   {cat}
@@ -193,17 +265,18 @@ export default function CashierDashboard() {
                 <button
                   key={product.id}
                   onClick={() => addToCart(product)}
-                  className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-orange-200 transition-all text-left flex flex-col h-full group"
+                  disabled={product.stock <= 0}
+                  className={`bg-white p-4 rounded-2xl border ${product.stock <= 0 ? 'border-red-200 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:shadow-md hover:border-orange-200'} shadow-sm transition-all text-left flex flex-col h-full group`}
                 >
-                  <div className="h-24 w-full bg-slate-50 rounded-xl mb-4 flex items-center justify-center text-4xl group-hover:scale-105 transition-transform">
-                    {product.image}
+                  <div className="h-24 w-full bg-orange-50 rounded-xl mb-4 flex items-center justify-center text-4xl group-hover:scale-105 transition-transform text-orange-400 font-black uppercase">
+                    {product.name.charAt(0)}
                   </div>
-                  <div className="mt-auto">
-                    <p className="text-xs text-slate-400 mb-1">{product.category}</p>
+                  <div className="mt-auto w-full">
+                    <p className="text-xs text-slate-400 mb-1 truncate">{product.category}</p>
                     <h3 className="text-sm font-bold text-slate-900 mb-1 line-clamp-2">{product.name}</h3>
                     <div className="flex justify-between items-center mt-2">
                       <p className="text-orange-600 font-bold text-sm">Rp {product.price.toLocaleString("id-ID")}</p>
-                      <span className="text-[10px] font-medium bg-slate-100 px-2 py-0.5 rounded text-slate-500">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${product.stock <= 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
                         Stok: {product.stock}
                       </span>
                     </div>
@@ -244,8 +317,8 @@ export default function CashierDashboard() {
             ) : (
               cart.map((item) => (
                 <div key={item.id} className="flex gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm relative group">
-                  <div className="h-14 w-14 bg-slate-50 rounded-lg flex items-center justify-center text-2xl shrink-0">
-                    {item.image}
+                  <div className="h-14 w-14 bg-orange-50 rounded-lg flex items-center justify-center text-2xl shrink-0 text-orange-400 font-bold uppercase">
+                    {item.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <h4 className="text-sm font-bold text-slate-900 truncate pr-6">{item.name}</h4>
@@ -291,13 +364,13 @@ export default function CashierDashboard() {
             </div>
 
             <button
-              onClick={handleCheckout}
+              onClick={handleOpenCheckoutModal}
               disabled={cart.length === 0 || checkoutSuccess}
               className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 mt-4 ${cart.length === 0
-                  ? "bg-slate-300 cursor-not-allowed shadow-none"
-                  : checkoutSuccess
-                    ? "bg-emerald-500 shadow-emerald-500/20"
-                    : "bg-orange-600 hover:bg-orange-700 shadow-orange-600/20 hover:shadow-xl hover:-translate-y-0.5"
+                ? "bg-slate-300 cursor-not-allowed shadow-none"
+                : checkoutSuccess
+                  ? "bg-emerald-500 shadow-emerald-500/20"
+                  : "bg-orange-600 hover:bg-orange-700 shadow-orange-600/20 hover:shadow-xl hover:-translate-y-0.5"
                 }`}
             >
               {checkoutSuccess ? (
@@ -307,7 +380,7 @@ export default function CashierDashboard() {
                 </>
               ) : (
                 <>
-                  Bayar Sekarang
+                  Lanjutkan Pembayaran
                 </>
               )}
             </button>
@@ -315,6 +388,63 @@ export default function CashierDashboard() {
         </aside>
 
       </div>
+
+      {/* Checkout Modal */}
+      {isCheckoutModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-lg font-bold text-slate-900">Detail Pembayaran</h3>
+              <button
+                onClick={() => setIsCheckoutModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            <form onSubmit={executeCheckout} className="p-6 space-y-4">
+              <div className="bg-orange-50 text-orange-800 px-4 py-3 rounded-xl flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold">Total Tagihan:</span>
+                <span className="text-xl font-black">Rp {total.toLocaleString("id-ID")}</span>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">Nama Pelanggan</label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                  placeholder="Misal: Budi / Pelanggan Umum"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-orange-500 text-sm"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">Metode Pembayaran</label>
+                <select
+                  value={paymentMethod}
+                  onChange={e => setPaymentMethod(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-orange-500 text-sm bg-white"
+                >
+                  <option value="Tunai">Tunai</option>
+                  <option value="QRIS">QRIS</option>
+                  <option value="Kartu Debit">Kartu Debit</option>
+                  <option value="Kartu Kredit">Kartu Kredit</option>
+                </select>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex justify-center items-center gap-2"
+                >
+                  <CheckCircleIcon className="h-5 w-5" />
+                  Konfirmasi Pembayaran
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
